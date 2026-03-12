@@ -6,6 +6,7 @@ const fs = require("fs");
 
 const dbPath = process.env.DB_PATH || "./cashbookdb";
 const bookName = process.env.BOOK_NAME || "";
+const configPath = "expenses_export_config.json";
 
 const validExpenseTypes = [
   "Sekuru",
@@ -24,6 +25,19 @@ function parseDate(dateStr) {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+function readConfig() {
+  if (fs.existsSync(configPath)) {
+    return JSON.parse(fs.readFileSync(configPath, "utf8"));
+  }
+  return { lastExportedId: 0 };
+}
+
+function writeConfig(lastExportedId) {
+  fs.writeFileSync(configPath, JSON.stringify({ lastExportedId }, null, 2));
+}
+
+const config = readConfig();
 
 const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
   if (err) {
@@ -47,8 +61,9 @@ const sql = `
   WHERE
     e.bookname = ?
     AND e.plusminus = 'false'
-    AND c.categoryName != 'Orders'`;
-db.all(sql, [bookName], (err, rows) => {
+    AND c.categoryName != 'Orders'
+    AND e.id > ?`;
+db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
   if (err) {
     throw err;
   }
@@ -62,12 +77,18 @@ db.all(sql, [bookName], (err, rows) => {
       description: e.partyname,
     }));
 
-  fs.writeFileSync(
-    "expenses_export.json",
-    JSON.stringify(expenses, null, 2),
-    "utf8"
-  );
-  console.log(`Exported ${expenses.length} expenses to expenses_export.json`);
+  if (expenses.length > 0) {
+    const maxId = Math.max(...rows.map((e) => e.id));
+    writeConfig(maxId);
+    fs.writeFileSync(
+      "expenses_export.json",
+      JSON.stringify(expenses, null, 2),
+      "utf8"
+    );
+    console.log(`Exported ${expenses.length} expenses to expenses_export.json`);
+  } else {
+    console.log("No new expenses to export");
+  }
 });
 
 db.close((err) => {
