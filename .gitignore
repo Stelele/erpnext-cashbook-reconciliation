@@ -148,3 +148,4 @@ vite.config.ts.timestamp-*
 *db*
 
 output.json
+expenses_export.json
