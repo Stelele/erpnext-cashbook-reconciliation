@@ -1,13 +1,13 @@
 {
   "name": "cashbook-erprenconciliation",
   "version": "1.0.0",
-  "description": "",
+  "description": "Script to extract expenses from a SQLite cashbook database and export them as JSON for reconciliation with the Njeremoto ERP.",
   "main": "main.js",
   "scripts": {
     "main": "node main.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["cashbook", "expenses", "sqlite", "erp", "reconciliation"],
+  "author": "Gift Mugweni",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
