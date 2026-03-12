@@ -9,5 +9,10 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "type": "module"
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "sqlite3": "^5.1.7",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
 }
