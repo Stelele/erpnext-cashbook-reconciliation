@@ -3,8 +3,9 @@ require("dotenv").config({ path: ".env" });
 
 const sqlite3 = require("sqlite3").verbose();
 const fs = require("fs");
+const moment = require("moment");
 
-const dbPath = process.env.DB_PATH || "./cashbookdb";
+const dbPath = process.env.DB_PATH || "./cashbook.db";
 const bookName = process.env.BOOK_NAME || "";
 const configPath = "expenses_export_config.json";
 
@@ -17,14 +18,6 @@ const validExpenseTypes = [
   "Staff",
   "Other",
 ];
-
-function parseDate(dateStr) {
-  const date = new Date(dateStr);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function readConfig() {
   if (fs.existsSync(configPath)) {
@@ -71,11 +64,15 @@ db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
   const expenses = rows
     .filter((e) => validExpenseTypes.includes(e.categoryName))
     .map((e) => ({
-      date: parseDate(e.date),
+      id: e.id,
+      date: moment(e.date, "DD MMM YYYY").format("YYYY-MM-DD"),
       expenseType: e.categoryName,
       amount: parseFloat(e.enteramount),
       description: e.partyname,
-    }));
+    }))
+    .sort((a, b) =>
+      moment(a.date, "YYYY-MM-DD").diff(moment(b.date, "YYYY-MM-DD"), "days"),
+    );
 
   if (expenses.length > 0) {
     const maxId = Math.max(...rows.map((e) => e.id));
@@ -83,7 +80,7 @@ db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
     fs.writeFileSync(
       "expenses_export.json",
       JSON.stringify(expenses, null, 2),
-      "utf8"
+      "utf8",
     );
     console.log(`Exported ${expenses.length} expenses to expenses_export.json`);
   } else {
