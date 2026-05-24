@@ -19,6 +19,10 @@ const validExpenseTypes = [
   "Other",
 ];
 
+function stripEmojis(str) {
+  return str.replace(/[^\x00-\x7F]/g, "").trim();
+}
+
 function readConfig() {
   if (fs.existsSync(configPath)) {
     return JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -62,6 +66,10 @@ db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
   }
 
   const expenses = rows
+    .map((e) => ({
+      ...e,
+      categoryName: stripEmojis(e.categoryName),
+    }))
     .filter((e) => validExpenseTypes.includes(e.categoryName))
     .map((e) => ({
       id: e.id,
