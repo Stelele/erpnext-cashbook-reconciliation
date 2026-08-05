@@ -6,7 +6,10 @@ const fs = require("fs");
 const moment = require("moment");
 
 const dbPath = process.env.DB_PATH || "./cashbook.db";
-const bookName = process.env.BOOK_NAME || "";
+const bookNames = (process.env.BOOK_NAME || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const configPath = "expenses_export_config.json";
 
 const validExpenseTypes = [
@@ -17,6 +20,8 @@ const validExpenseTypes = [
   "Consumables",
   "Staff",
   "Other",
+  "Transportation",
+  "Fuel"
 ];
 
 function stripEmojis(str) {
@@ -27,11 +32,11 @@ function readConfig() {
   if (fs.existsSync(configPath)) {
     return JSON.parse(fs.readFileSync(configPath, "utf8"));
   }
-  return { lastExportedId: 0 };
+  return { lastExportedTimestamp: 0 };
 }
 
-function writeConfig(lastExportedId) {
-  fs.writeFileSync(configPath, JSON.stringify({ lastExportedId }, null, 2));
+function writeConfig(lastExportedTimestamp) {
+  fs.writeFileSync(configPath, JSON.stringify({ lastExportedTimestamp }, null, 2));
 }
 
 const config = readConfig();
@@ -43,6 +48,7 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
   console.log("Connected to the SQLite database.");
 });
 
+const placeholders = bookNames.map(() => "?").join(", ");
 const sql = `
   SELECT
     e.id,
@@ -51,30 +57,30 @@ const sql = `
     e.partyname,
     e.date,
     e.time,
+    e.last_edit_time,
     c.categoryName
   FROM entry e
   LEFT JOIN CashOutCategory c
     ON e.categoryId = c.id
   WHERE
-    e.bookname = ?
+    e.bookname IN (${placeholders})
     AND e.plusminus = 'false'
     AND c.categoryName != 'Orders'
-    AND e.id > ?`;
-db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
+    AND e.last_edit_time > ?`;
+db.all(sql, [...bookNames, config.lastExportedTimestamp], (err, rows) => {
   if (err) {
     throw err;
   }
 
   const expenses = rows
-    .map((e) => ({
-      ...e,
-      categoryName: stripEmojis(e.categoryName),
-    }))
-    .filter((e) => validExpenseTypes.includes(e.categoryName))
+    .filter(
+      (e) => validExpenseTypes.includes(stripEmojis(e.categoryName)),
+    )
     .map((e) => ({
       id: e.id,
+      bookname: e.bookname,
       date: moment(e.date, "DD MMM YYYY").format("YYYY-MM-DD"),
-      expenseType: e.categoryName,
+      expenseType: stripEmojis(e.categoryName),
       amount: parseFloat(e.enteramount),
       description: e.partyname,
     }))
@@ -83,8 +89,8 @@ db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
     );
 
   if (expenses.length > 0) {
-    const maxId = Math.max(...rows.map((e) => e.id));
-    writeConfig(maxId);
+    const maxTimestamp = Math.max(...rows.map((e) => e.last_edit_time));
+    writeConfig(maxTimestamp);
     fs.writeFileSync(
       "expenses_export.json",
       JSON.stringify(expenses, null, 2),
@@ -94,11 +100,11 @@ db.all(sql, [bookName, config.lastExportedId], (err, rows) => {
   } else {
     console.log("No new expenses to export");
   }
-});
 
-db.close((err) => {
-  if (err) {
-    console.error(err.message);
-  }
-  console.log("Closed the database connection.");
+  db.close((err) => {
+    if (err) {
+      console.error(err.message);
+    }
+    console.log("Closed the database connection.");
+  });
 });
