@@ -21,7 +21,9 @@ const validExpenseTypes = [
   "Staff",
   "Other",
   "Transportation",
-  "Fuel"
+  "Fuel",
+  "Maintainace",
+  "Maintainance",
 ];
 
 function stripEmojis(str) {
@@ -36,7 +38,10 @@ function readConfig() {
 }
 
 function writeConfig(lastExportedTimestamp) {
-  fs.writeFileSync(configPath, JSON.stringify({ lastExportedTimestamp }, null, 2));
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({ lastExportedTimestamp }, null, 2),
+  );
 }
 
 const config = readConfig();
@@ -73,9 +78,7 @@ db.all(sql, [...bookNames, config.lastExportedTimestamp], (err, rows) => {
   }
 
   const expenses = rows
-    .filter(
-      (e) => validExpenseTypes.includes(stripEmojis(e.categoryName)),
-    )
+    .filter((e) => validExpenseTypes.includes(stripEmojis(e.categoryName)))
     .map((e) => ({
       id: e.id,
       bookname: e.bookname,
