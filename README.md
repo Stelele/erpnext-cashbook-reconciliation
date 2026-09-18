@@ -50,7 +50,7 @@ Create a `.env` file (or modify existing) with the following variable names only
 
 > Note: The shipped `.env` sets `DB_PATH` to a value that differs from the code default (`./cashbook.db`) — verify `.env` points at the real SQLite file, since a `DB_PATH` set in `.env` overrides the code default.
 
-The script also reads `expenses_export_config.json` to track `lastExportedTimestamp` for incremental export control.
+The script also reads `expenses_export_config.json` to track `lastExportedTimestamp` for incremental export control. The stored timestamp is the maximum `last_edit_time` across **all** rows the query returns — including rows later excluded by the valid-category filter — so excluded rows still advance the watermark. If you change the valid expense types, delete `expenses_export_config.json` (or set `lastExportedTimestamp` to an earlier value) and re-run to re-include previously excluded entries.
 
 ## Usage
 
@@ -62,7 +62,7 @@ npm run main
 
 On first run, the script will:
 1. Read the last exported timestamp from `expenses_export_config.json` (or start at 0)
-2. Query the SQLite database for new entries since that timestamp
+2. Query the SQLite database for entries created or updated since that timestamp (`last_edit_time > lastExportedTimestamp`)
 3. Filter by valid expense types and cashbook names
 4. Transform and sort the data
 5. Write `expenses_export.json` and update the config file
@@ -91,7 +91,7 @@ On first run, the script will:
 
 | Issue | Resolution |
 |---|---|
-| "No new expenses to export" | The script has processed all entries up to the last tracked ID. Verify `BOOK_NAME` and `DB_PATH` are correct. |
+| "No new expenses to export" | The script has processed all entries up to the last tracked edit timestamp (`last_edit_time`), not an entry ID. Verify `BOOK_NAME` and `DB_PATH` are correct. |
 | Script throws `err.message` on DB open | Ensure the SQLite database file exists at the path specified by `DB_PATH` and contains the expected `entry` and `CashOutCategory` tables. |
 | Export includes unwanted categories | Check that `BOOK_NAME` matches your cashbook names and that categories are in the valid expense types list. |
 | Date format unexpected | Ensure entries in the SQLite database have dates in `DD MMM YYYY` format (e.g., `04 Jan 2026`). |

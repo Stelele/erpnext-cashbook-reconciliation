@@ -81,7 +81,15 @@ Two files are written to the project root upon successful execution:
 
 ### 5. Debugging tips
 
-- Run `node main.js` and inspect console output for SQL errors or filter exclusions.
+- Run `node main.js` and inspect console output for SQL errors. The script does **not** log filter exclusions — the console only reports the exported count. To see which rows were excluded by the `validExpenseTypes` whitelist, query the database directly and compare `categoryName` against `validExpenseTypes` in `main.js`:
+  ```sql
+  SELECT e.id, e.bookname, e.last_edit_time, c.categoryName
+  FROM entry e
+  LEFT JOIN CashOutCategory c ON e.categoryId = c.id
+  WHERE e.bookname IN ('Ecocash','Momo','AgentFloat')
+    AND e.plusminus = 'false';
+  ```
+- If you change `validExpenseTypes`, previously excluded rows are still skipped because `lastExportedTimestamp` is the max `last_edit_time` of **all** rows the query returns — including rows later excluded by the filter. Delete `expenses_export_config.json` (or set `lastExportedTimestamp` to an earlier value) and re-run to re-include them.
 - If `expenses_export_config.json` exists, the script will only export entries with `last_edit_time >` the stored timestamp.
 - To start fresh, delete `expenses_export_config.json` (or set `lastExportedTimestamp` to `0`).
 - Valid expense types are defined in the `validExpenseTypes` array in `main.js`; add/remove entries there to adjust filtering.
@@ -92,13 +100,19 @@ Two files are written to the project root upon successful execution:
 /cashbook-recon
 ├── main.js          # Core script — SQLite query, filtering, transformation, export
 ├── package.json     # Node.js dependencies (dotenv, moment, sqlite3)
-├── .env             # Environment variables (DB_PATH, BOOK_NAME)
-├── .env.local       # Preferred env (loaded first by dotenv)
-├── expenses_export.json    # Generated output — do not edit manually
+├── package-lock.json
+├── .env             # Environment variables (DB_PATH, BOOK_NAME) — committed repo file
+├── .env.local       # Optional local override (loaded first by dotenv) — gitignored, user-provided
+├── LICENSE
+├── README.md        # Project overview
+├── docs/
+│   ├── DEVELOPER.md # This guide
+│   └── USER_GUIDE.md
+├── expenses_export.json         # Generated output — do not edit manually
 └── expenses_export_config.json  # Generated config — do not edit manually
 ```
 
-(Only `main.js` and `package.json` are source; all other files are generated at runtime.)
+`expenses_export.json` and `expenses_export_config.json` are the only files generated at runtime. All other files (`main.js`, `package.json`, `package-lock.json`, `.env`, `.env.local`, `README.md`, `docs/`, `LICENSE`, `.gitignore`) are repo files, not runtime outputs.
 
 ## Notes
 
@@ -106,3 +120,4 @@ Two files are written to the project root upon successful execution:
 - Adding a new valid expense type: edit the `validExpenseTypes` array in `main.js`.
 - Changing the date format: modify the `moment(e.date, "DD MMM YYYY")` pattern and the SQL `SELECT` date column source.
 - The `expenses_export_config.json` enables incremental exports: each run only exports new/updated entries since the last run.
+- **`validExpenseTypes` changes vs. the watermark**: `lastExportedTimestamp` is written as the max `last_edit_time` across **all** rows the query returns — not just the rows that survive the whitelist filter. Excluded rows therefore still advance the watermark. After adding/removing valid expense types, reset `expenses_export_config.json` (delete it or set `lastExportedTimestamp` to an earlier value) and re-run to pick up previously excluded entries.

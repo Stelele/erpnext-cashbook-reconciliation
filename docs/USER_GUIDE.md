@@ -67,7 +67,7 @@ npm run main
    - `description`: value from `partyname`
    - `bookname` and `id` are preserved
    - Results are sorted by date ascending.
-7. **Config update** — If new expenses are found, the script writes `expenses_export_config.json` with the maximum `last_edit_time` from the current batch, enabling incremental exports on subsequent runs.
+7. **Config update** — If new expenses are found, the script writes `expenses_export_config.json` with the maximum `last_edit_time` from the current batch, enabling incremental exports on subsequent runs. Note: the watermark covers all queried rows including filter-excluded ones — if you change `validExpenseTypes`, delete `expenses_export_config.json` (or reset the timestamp) and re-run, otherwise previously excluded rows will never be picked up.
 8. **Output files** — Two files are written to the project root:
    - `expenses_export.json` — The processed expense array.
    - `expenses_export_config.json` — The updated config (only written if new data was found).
@@ -95,7 +95,7 @@ The script does **not** directly post to ERPNext. After running the script, the 
 | "No new expenses to export" | All entries up to `lastExportedTimestamp` have already been processed. | Reset `expenses_export_config.json` to `{ "lastExportedTimestamp": 0 }` if a fresh export is needed, or verify `BOOK_NAME`. |
 | Export missing expected entries | `BOOK_NAME` values don't match `bookname` values in the database, or categories are not in the valid list. | Check the distinct `bookname` values in the `entry` table and update `BOOK_NAME`. |
 | Dates appear as `Invalid Date` | SQLite date format is not `DD MMM YYYY`. | Verify the date format in the source database or adjust the `moment(e.date, "DD MMM YYYY")` parsing in `main.js`. |
-| `categoryName` is `undefined` | The `LEFT JOIN` with `CashOutCategory` did not match. | Ensure every entry has a valid `categoryId` that references an existing `CashOutCategory.id`. |
+| Entries with a category are missing from the export | The category (after emoji stripping) is not one of the valid expense types, or the `LEFT JOIN` with `CashOutCategory` did not match. | Unmatched categories are **omitted** from the export, not reported as an error. Ensure every entry has a valid `categoryId` that references an existing `CashOutCategory.id`, and that its `categoryName` is in the valid expense types list. |
 
 ## Summary
 
